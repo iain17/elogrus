@@ -79,12 +79,19 @@ func NewElasticHook(client *elastic.Client, host string, level logrus.Level, ind
 }
 
 func setFileFunc(entry *logrus.Entry) {
-	if pc, file, line, ok := runtime.Caller(7); ok {
+	if pc, file, line, ok := runtime.Caller(8); ok {
 		funcName := runtime.FuncForPC(pc).Name()
+
+		if funcName == "runtime.main" {
+			if pc, file, line, ok = runtime.Caller(7); ok {
+				funcName = runtime.FuncForPC(pc).Name()
+			}
+		}
 
 		entry.Data["file"] = path.Base(file)
 		entry.Data["func"] = path.Base(funcName)
 		entry.Data["line"] = line
+
 	}
 }
 
