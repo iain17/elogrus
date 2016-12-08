@@ -9,6 +9,8 @@ import (
 
 	"golang.org/x/net/context"
 	"gopkg.in/olivere/elastic.v5"
+	"runtime"
+	"path"
 )
 
 var (
@@ -76,11 +78,22 @@ func NewElasticHook(client *elastic.Client, host string, level logrus.Level, ind
 	}, nil
 }
 
+func setFileFunc(entry *logrus.Entry) {
+	if pc, file, line, ok := runtime.Caller(7); ok {
+		funcName := runtime.FuncForPC(pc).Name()
+
+		entry.Data["file"] = path.Base(file)
+		entry.Data["func"] = path.Base(funcName)
+		entry.Data["line"] = line
+	}
+}
+
 // Fire is required to implement
 // Logrus hook
 func (hook *ElasticHook) Fire(entry *logrus.Entry) error {
 
 	level := entry.Level.String()
+	setFileFunc(entry)
 
 	msg := struct {
 		Host      string
