@@ -11,6 +11,7 @@ import (
 	"gopkg.in/olivere/elastic.v5"
 	"runtime"
 	"path"
+	"os"
 )
 
 var (
@@ -24,10 +25,25 @@ var (
 type ElasticHook struct {
 	client    *elastic.Client
 	host      string
+	service   string
+	version   string
 	index     string
 	levels    []logrus.Level
 	ctx       context.Context
 	ctxCancel context.CancelFunc
+}
+
+type Log struct {
+	Service   string
+	Version	  string
+	Host      string
+	File   	  string
+	FuncName  string
+	Line	  int
+	Timestamp string
+	Message   string
+	Level     logrus.Level
+	Data      logrus.Fields
 }
 
 // NewElasticHook creates new hook
@@ -35,7 +51,7 @@ type ElasticHook struct {
 // host - host of system
 // level - log level
 // index - name of the index in ElasticSearch
-func NewElasticHook(client *elastic.Client, host string, level logrus.Level, index string) (*ElasticHook, error) {
+func NewElasticHook(client *elastic.Client, service string, version string, level logrus.Level, index string) (*ElasticHook, error) {
 	levels := []logrus.Level{}
 	for _, l := range []logrus.Level{
 		logrus.PanicLevel,
@@ -67,10 +83,13 @@ func NewElasticHook(client *elastic.Client, host string, level logrus.Level, ind
 			return nil, ErrCannotCreateIndex
 		}
 	}
+	hostname, _  := os.Hostname()
 
 	return &ElasticHook{
 		client:    client,
-		host:      host,
+		host:      hostname,
+		service:   service,
+		version:   version,
 		index:     index,
 		levels:    levels,
 		ctx:       ctx,
@@ -95,38 +114,26 @@ func getCallee(level int) (string, string, int) {
 	return "", "", 0
 }
 
-func setFileFunc(entry *logrus.Entry) {
-	level := 7
-	//if len(entry.Data) == 0 {// if don't use withfields
-	//	level = 7
-	//}
-	file, funcName, line := getCallee(level)
+// Fire is required to implement
+// Logrus hook
+func (hook *ElasticHook) Fire(entry *logrus.Entry) error {
+	file, funcName, line := getCallee(7)
 
 	entry.Data["file"] = path.Base(file)
 	entry.Data["func"] = path.Base(funcName)
 	entry.Data["line"] = line
 
-}
-
-// Fire is required to implement
-// Logrus hook
-func (hook *ElasticHook) Fire(entry *logrus.Entry) error {
-
-	level := entry.Level.String()
-	setFileFunc(entry)
-
-	msg := struct {
-		Host      string
-		Timestamp string
-		Message   string
-		Data      logrus.Fields
-		Level     string
-	}{
-		hook.host,
-		entry.Time.UTC().Format(time.RFC3339Nano),
-		entry.Message,
-		entry.Data,
-		strings.ToUpper(level),
+	msg := Log{
+		Service: hook.service,
+		Version: hook.version,
+		Host: hook.host,
+		File: path.Base(file),
+		FuncName: path.Base(funcName),
+		Line: line,
+		Timestamp: entry.Time.UTC().Format(time.RFC3339Nano),
+		Level: entry.Level,
+		Message: entry.Message,
+		Data: entry.Data,
 	}
 
 	_, err := hook.client.
