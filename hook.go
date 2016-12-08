@@ -78,21 +78,33 @@ func NewElasticHook(client *elastic.Client, host string, level logrus.Level, ind
 	}, nil
 }
 
-func setFileFunc(entry *logrus.Entry) {
-	if pc, file, line, ok := runtime.Caller(8); ok {
-		funcName := runtime.FuncForPC(pc).Name()
-
-		if funcName == "runtime.main" {
-			if pc, file, line, ok = runtime.Caller(7); ok {
-				funcName = runtime.FuncForPC(pc).Name()
+func getCallee(level int) (string, string, int) {
+	for i := 0; i < 10; i++ {
+		if pc, file, line, ok := runtime.Caller(level); ok {
+			funcName := path.Base(runtime.FuncForPC(pc).Name())
+			if !strings.HasPrefix(funcName, "logrus") && !strings.HasPrefix(funcName, "PocketLogger") {
+				return funcName, file, line
 			}
+		} else {
+			break
 		}
-
-		entry.Data["file"] = path.Base(file)
-		entry.Data["func"] = path.Base(funcName)
-		entry.Data["line"] = line
-
+		level++
 	}
+
+	return "", "", 0
+}
+
+func setFileFunc(entry *logrus.Entry) {
+	level := 8
+	if len(entry.Data) == 0 {// if don't use withfields
+		level = 8
+	}
+	file, funcName, line := getCallee(level)
+
+	entry.Data["file"] = path.Base(file)
+	entry.Data["func"] = path.Base(funcName)
+	entry.Data["line"] = line
+
 }
 
 // Fire is required to implement
