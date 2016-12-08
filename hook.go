@@ -82,6 +82,7 @@ func getCallee(level int) (string, string, int) {
 	for i := 0; i < 10; i++ {
 		if pc, file, line, ok := runtime.Caller(level); ok {
 			funcName := path.Base(runtime.FuncForPC(pc).Name())
+			//fmt.Println(funcName, file, line)
 			if !strings.HasPrefix(funcName, "logrus") && !strings.HasPrefix(funcName, "PocketLogger") {
 				return file, funcName, line
 			}
@@ -95,10 +96,10 @@ func getCallee(level int) (string, string, int) {
 }
 
 func setFileFunc(entry *logrus.Entry) {
-	level := 8
-	if len(entry.Data) == 0 {// if don't use withfields
-		level = 8
-	}
+	level := 7
+	//if len(entry.Data) == 0 {// if don't use withfields
+	//	level = 7
+	//}
 	file, funcName, line := getCallee(level)
 
 	entry.Data["file"] = path.Base(file)
